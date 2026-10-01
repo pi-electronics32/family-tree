@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Our Family Legacy</title>
+<style>
+:root{
+  --bg:#0a0f0c; --panel:#151c17; --panel2:#1b251d; --gold:#d8b66d;
+  --text:#f4f1e8; --muted:#aab4ab; --line:#60705f; --accent:#8eaa80;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--text);
+  background:radial-gradient(circle at top,#26372a 0,#0a0f0c 52%,#070907 100%);
+  font-family:Georgia,"Times New Roman",serif;
+}
+header{text-align:center;padding:42px 18px 28px;border-bottom:1px solid #263128}
+.kicker{font:12px Arial,sans-serif;letter-spacing:4px;text-transform:uppercase;color:var(--gold)}
+h1{font-size:clamp(34px,6vw,64px);margin:10px 0 5px}
+.subtitle{font:14px Arial,sans-serif;color:var(--muted)}
+.wrap{max-width:1500px;margin:auto;padding:22px 14px 60px}
+.toolbar{text-align:center;margin-bottom:18px}
+input{
+  width:min(560px,100%);padding:14px 20px;border-radius:30px;
+  border:1px solid #3b493d;background:#111711;color:#fff;font-size:16px;outline:none
+}
+.tree{
+  overflow-x:auto;padding:10px 8px 35px;
+}
+.generation{width:max-content;min-width:100%;margin:0 auto 48px}
+.gtitle{
+  text-align:center;color:var(--gold);font:600 14px Arial,sans-serif;
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:20px
+}
+.family-row{
+  display:flex;justify-content:center;align-items:flex-start;
+  gap:26px;flex-wrap:wrap
+}
+.family-branch{
+  display:flex;flex-direction:column;align-items:center;min-width:205px;
+  position:relative
+}
+.couple{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.person{
+  width:175px;min-height:105px;padding:13px;border:1px solid #354338;
+  border-radius:16px;background:linear-gradient(145deg,var(--panel2),var(--panel));
+  box-shadow:0 8px 24px #0007;text-align:left;transition:.2s
+}
+.person:hover{border-color:var(--gold);transform:translateY(-2px)}
+.plus{font-size:25px;color:var(--gold);font-weight:bold}
+.avatar{
+  width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
+  background:#28362a;border:1px solid #5b6c5a;color:var(--gold);font-size:14px;
+  margin-bottom:8px
+}
+.name{font-weight:bold;font-size:15px;line-height:1.2}
+.meta{font:11px Arial,sans-serif;color:var(--muted);margin-top:4px}
+.note{font:11px Arial,sans-serif;color:#c4ccc5;margin-top:7px;line-height:1.3}
+.branch{
+  width:2px;background:var(--line);height:24px;margin-top:0;position:relative
+}
+.branch:after{
+  content:"";position:absolute;left:50%;top:24px;width:2px;height:12px;
+  background:var(--line);transform:translateX(-50%)
+}
+.children{
+  position:relative;margin-top:35px;padding-top:20px;
+  display:flex;justify-content:center;gap:18px;flex-wrap:wrap
+}
+.children:before{
+  content:"";position:absolute;top:0;left:calc(50% - 1px);height:20px;width:2px;background:var(--line)
+}
+.child{
+  position:relative;min-width:165px
+}
+.child:before{
+  content:"";position:absolute;top:-20px;left:50%;height:20px;width:2px;
+  background:var(--line);transform:translateX(-50%)
+}
+.child .person{width:165px}
+.single{
+  display:flex;justify-content:center
+}
+.search-hidden{display:none!important}
+.empty{text-align:center;color:var(--muted);font:14px Arial;padding:35px;display:none}
+footer{text-align:center;color:#6f796f;font:11px Arial;padding:18px}
+@media(max-width:650px){
+  .person{width:155px}.child .person{width:155px}
+  .family-branch{min-width:190px}.family-row{gap:18px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Family Legacy</div>
+  <h1>Roots That Made Us</h1>
+  <div class="subtitle">Our family, generation by generation</div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search family member..." autocomplete="off">
+  </div>
+  <div id="tree" class="tree"></div>
+  <div id="empty" class="empty">No family member found.</div>
+</main>
+
+<footer>Our Family Legacy</footer>
+
+<script>
+const people = {{ people|tojson }};
+const relationships = {{ relationships|tojson }};
+
+const byId = Object.fromEntries(people.map(p => [p.id, p]));
+
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+function initials(n){
+  return String(n).split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
+}
+
+/*
+ Explicit family order supplied by the family.
+ Alphabetical sorting is deliberately NOT used.
+ Names are matched case-insensitively and with punctuation ignored.
+*/
+const preferredGenerations = [
+  [
+    ["Karan Singh"]
+  ],
+  [
+    ["Raja Singh"], ["Indradev Singh"], ["Matki Singh"]
+  ],
+  [
+    ["RamPrit Singh"], ["Ram Bricch Singh"], ["Bhagwan Singh"], ["Ganesh Singh"]
+  ],
+  [
+    ["Jaglal Singh","Rajkali Devi"], ["Jairam Singh"], ["Phulahi Devi"], ["Lalpati Devi"]
+  ],
+  [
+    ["Shushil K Singh","Late Dr. Sunita Singh"],
+    ["Vakil Singh","Sumitra Devi"],
+    ["Kedarnath Singh","Anita Devi"],
+    ["Poornima Devi","Sanjeet Singh"],
+    ["Bijendra Singh","Poonam Devi"],
+    ["Biresh K Singh","Lovely Devi"],
+    ["Chandani Devi"]
+  ],
+  [
+    ["Vikash Kumar","Ishita Raghuvanshi"],
+    ["Pooja Singh","Ankit"],
+    ["Preeti Singh","Manoranjan Kumar"],
+    ["Manish Singh","Riya Kumari"],
+    ["Khusboo Singh"],
+    ["Akash"], ["Kajal"],
+    ["Rohiit"], ["Ankit"],
+    ["Priyanshu Singh"], ["Palak"],
+    ["Simran"], ["Aditya"], ["Arushi"]
+  ],
+  [
+    ["Ishvika"], ["Ishan"], ["Aditi"],
+    ["Siddhart"], ["Samridhhi"], ["Kartik"]
+  ]
+];
+
+function norm(s){
+  return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
+function findPerson(name, used){
+  const target=norm(name);
+  return people.find(p=>!used.has(p.id) && norm(p.name)===target)
+      || people.find(p=>!used.has(p.id) && norm(p.name).includes(target))
+      || null;
+}
+
+function personCard(p){
+  if(!p) return "";
+  return `<article class="person" data-person="${esc(p.name.toLowerCase())}">
+    <div class="avatar">${esc(initials(p.name))}</div>
+    <div class="name">${esc(p.name)}</div>
+    <div class="meta">${p.gender==="M"?"Male":p.gender==="F"?"Female":"Family Member"}</div>
+    ${p.notes?`<div class="note">${esc(p.notes)}</div>`:""}
+  </article>`;
+}
+
+function renderGeneration(groups, genIndex){
+  const section=document.createElement("section");
+  section.className="generation";
+  section.innerHTML=`<div class="gtitle">Generation ${genIndex+1}</div>`;
+
+  const row=document.createElement("div");
+  row.className="family-row";
+
+  groups.forEach(group=>{
+    const branch=document.createElement("div");
+    branch.className="family-branch";
+
+    const couple=document.createElement("div");
+    couple.className="couple";
+
+    const a=group[0], b=group[1];
+    if(a && b){
+      couple.innerHTML=personCard(a)+`<span class="plus">+</span>`+personCard(b);
+    }else if(a){
+      couple.innerHTML=personCard(a);
+    }
+
+    branch.appendChild(couple);
+    row.appendChild(branch);
+  });
+
+  section.appendChild(row);
+  return section;
+}
+
+function buildTree(){
+  const tree=document.getElementById("tree");
+  tree.innerHTML="";
+  const used=new Set();
+
+  preferredGenerations.forEach((gen,gi)=>{
+    const groups=[];
+    gen.forEach(names=>{
+      const group=[];
+      names.forEach(name=>{
+        const p=findPerson(name,used);
+        if(p){group.push(p);used.add(p.id);}
+      });
+      if(group.length) groups.push(group);
+    });
+    tree.appendChild(renderGeneration(groups,gi));
+  });
+
+  // Any records not covered by the explicit order appear at the end,
+  // preserving database order rather than alphabetically sorting them.
+  const leftovers=people.filter(p=>!used.has(p.id));
+  if(leftovers.length){
+    const section=document.createElement("section");
+    section.className="generation";
+    section.innerHTML='<div class="gtitle">Additional Family Members</div>';
+    const row=document.createElement("div");
+    row.className="family-row";
+    leftovers.forEach(p=>{
+      const b=document.createElement("div");
+      b.className="family-branch";
+      b.innerHTML=personCard(p);
+      row.appendChild(b);
+    });
+    section.appendChild(row);
+    tree.appendChild(section);
+  }
+}
+
+document.getElementById("search").addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase().trim();
+  let found=0;
+  document.querySelectorAll("[data-person]").forEach(card=>{
+    const ok=card.dataset.person.includes(q);
+    card.classList.toggle("search-hidden",!ok);
+    if(ok) found++;
+  });
+  document.getElementById("empty").style.display=(q && !found)?"block":"none";
+});
+
+buildTree();
+</script>
+</body>
+</html>
