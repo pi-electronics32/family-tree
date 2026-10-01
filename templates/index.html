@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Family Legacy</title>
+<style>
+:root{--bg:#0b100d;--card:#151c17;--card2:#1b241d;--gold:#d7b56d;--text:#f4f1e8;--muted:#aeb7af;--line:#526052;--green:#7e9e73}
+*{box-sizing:border-box}body{margin:0;color:var(--text);background:radial-gradient(circle at top,#26382a 0,#0b100d 48%,#070a08 100%);font-family:Georgia,serif}
+header{text-align:center;padding:42px 18px 26px;border-bottom:1px solid #263027}.kicker{color:var(--gold);letter-spacing:4px;font:12px Arial;text-transform:uppercase}.title{font-size:clamp(34px,6vw,64px);margin:10px 0 5px}.sub{color:var(--muted);font:14px Arial}
+.wrap{max-width:1500px;margin:auto;padding:22px 16px 60px}.toolbar{text-align:center;margin-bottom:24px}input{width:min(560px,100%);padding:14px 20px;border-radius:30px;border:1px solid #39463b;background:#111711;color:#fff;font-size:15px}
+.legend{text-align:center;color:var(--muted);font:12px Arial;margin-bottom:28px}
+.tree{overflow-x:auto;padding:10px 5px 35px}.generation{min-width:max-content;margin:0 auto 40px;position:relative}
+.gtitle{text-align:center;color:var(--gold);font:600 15px Arial;letter-spacing:2px;margin:0 0 18px;text-transform:uppercase}
+.row{display:flex;justify-content:center;align-items:flex-start;gap:20px;flex-wrap:wrap;max-width:1450px;margin:auto}
+.family{display:flex;align-items:center;gap:8px;position:relative}
+.card{width:190px;min-height:126px;padding:15px;border:1px solid #344135;border-radius:17px;background:linear-gradient(145deg,var(--card2),var(--card));box-shadow:0 10px 28px #0007;position:relative;transition:.2s}
+.card:hover{transform:translateY(-3px);border-color:var(--gold)}.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#28362a;border:1px solid #596a59;color:var(--gold);font-size:16px;margin-bottom:9px}.name{font-weight:bold;font-size:16px;line-height:1.2}.meta{font:11px Arial;color:var(--muted);margin-top:5px}.note{font:11px Arial;color:#c4cbc5;margin-top:8px;line-height:1.35}.spouse{color:#cdbb8d;font:11px Arial;margin-top:7px}
+.connector{color:var(--gold);font-size:20px}.empty{text-align:center;color:var(--muted);padding:35px;font:14px Arial}
+.connections{border-top:1px solid #273329;padding-top:25px}.connections h2{text-align:center;color:var(--gold);font-weight:normal}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.rel{padding:10px;border:1px solid #29362c;border-radius:10px;background:#111711;font:12px Arial;color:#d6ddd7}
+footer{text-align:center;color:#69736b;font:11px Arial;padding:20px}
+@media(max-width:650px){.card{width:180px}.row{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header><div class="kicker">Family Legacy</div><div class="title">Roots That Made Us</div><div class="sub">Our family tree — arranged generation by generation</div></header>
+<main class="wrap">
+<div class="toolbar"><input id="search" placeholder="Search family member..." autocomplete="off"></div>
+<div class="legend">Spouses are kept in the same generation as their partner · Children move to the next generation</div>
+<div id="tree" class="tree"></div>
+<div id="empty" class="empty" style="display:none">No family member found.</div>
+<section class="connections"><h2>Family Connections</h2><div id="connections" class="grid"></div></section>
+</main>
+<footer>Our Family Legacy · Preserving names, stories and connections for generations.</footer>
+
+<script>
+const people={{people|tojson}};
+const relationships={{relationships|tojson}};
+const byId=Object.fromEntries(people.map(p=>[p.id,p]));
+const parentEdges=relationships.filter(r=>r.relation==="parent");
+const spouseEdges=relationships.filter(r=>r.relation==="spouse");
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
+function initials(n){return n.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();}
+
+function buildGenerations(){
+  // IMPORTANT: spouse = same generation; parent->child = next generation.
+  const level={};
+  const children={};
+  const spouses={};
+  parentEdges.forEach(r=>(children[r.person1]??=[]).push(r.person2));
+  spouseEdges.forEach(r=>{
+    (spouses[r.person1]??=[]).push(r.person2);
+    (spouses[r.person2]??=[]).push(r.person1);
+  });
+
+  // Start from Karan Singh, the known family root.
+  const root=people.find(p=>p.name==="Karan Singh") || people[0];
+  const queue=root?[[root.id,0]]:[];
+  const inQueue=new Set();
+
+  while(queue.length){
+    const [id,lvl]=queue.shift();
+    if(level[id]!==undefined && level[id] <= lvl) continue;
+    level[id]=lvl;
+    (spouses[id]||[]).forEach(s=>queue.push([s,lvl]));
+    (children[id]||[]).forEach(c=>queue.push([c,lvl+1]));
+  }
+
+  // Any disconnected people get placed after the connected tree, rather than
+  // accidentally appearing as Generation 1.
+  const max=Object.values(level).length?Math.max(...Object.values(level)):0;
+  people.forEach(p=>{if(level[p.id]===undefined) level[p.id]=max+1;});
+
+  const groups={};
+  people.forEach(p=>(groups[level[p.id]]??=[]).push(p));
+  return groups;
+}
+
+function spouseNames(id){
+  return spouseEdges.filter(r=>r.person1===id||r.person2===id)
+    .map(r=>byId[r.person1===id?r.person2:r.person1]?.name).filter(Boolean);
+}
+
+function makeCard(p){
+  const s=spouseNames(p.id);
+  return `<article class="card" data-name="${esc(p.name.toLowerCase())}">
+    <div class="avatar">${esc(initials(p.name))}</div>
+    <div class="name">${esc(p.name)}</div>
+    <div class="meta">${p.gender==="M"?"Male":p.gender==="F"?"Female":"Family Member"}</div>
+    ${s.length?`<div class="spouse">♥ ${s.map(esc).join(" · ")}</div>`:""}
+    ${p.notes?`<div class="note">${esc(p.notes)}</div>`:""}
+  </article>`;
+}
+
+function render(){
+  const tree=document.getElementById("tree"); tree.innerHTML="";
+  const groups=buildGenerations();
+  Object.keys(groups).sort((a,b)=>a-b).forEach(k=>{
+    const sec=document.createElement("section"); sec.className="generation";
+    const row=document.createElement("div"); row.className="row";
+    row.innerHTML=groups[k].map(makeCard).join("");
+    sec.innerHTML=`<div class="gtitle">Generation ${Number(k)+1}</div>`;
+    sec.appendChild(row); tree.appendChild(sec);
+  });
+}
+
+function renderConnections(){
+  document.getElementById("connections").innerHTML=relationships.map(r=>{
+    const a=byId[r.person1]?.name||"Unknown", b=byId[r.person2]?.name||"Unknown";
+    const text=r.relation==="spouse"?"♥ married to":"→ child of";
+    return `<div class="rel"><b>${esc(a)}</b> ${text} <b>${esc(b)}</b></div>`;
+  }).join("");
+}
+document.getElementById("search").addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase().trim(); let found=0;
+  document.querySelectorAll(".card").forEach(c=>{const ok=c.dataset.name.includes(q);c.style.display=ok?"block":"none";if(ok)found++;});
+  document.getElementById("empty").style.display=found?"none":"block";
+});
+render();renderConnections();
+</script>
+</body>
+</html>
